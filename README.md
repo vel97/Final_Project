@@ -14,12 +14,12 @@ Hi everyone. This is a classification problem regarding customers data who tend 
           Interpreting the data using cross validaton and confusion matrix and analyse the performance of the model using the results obtained.
          
 **Packages Used:**
-       Numpy
-       Pandas
-       Matplotlib
-       Plotline
-       imblearn
-       sklearn
+       Numpy,
+       Pandas,
+       Matplotlib,
+       Plotline,
+       imblearn,
+       sklearn.
        
        
     
