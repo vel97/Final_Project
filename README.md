@@ -1,0 +1,1 @@
+Hi everyone. This is a classification problem regarding customers data who tend to get an insurance. We are going to make prediction with classification algorithms to identify the best model for thwe problem statemen by tring different methods of classification.
