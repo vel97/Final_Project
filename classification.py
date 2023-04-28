@@ -1,5 +1,17 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotnine
+from plotnine import ggplot, aes, geom_bar, geom_histogram, labs, geom_boxplot, geom_point
+from imblearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import RepeatedStratifiedKFold
+from numpy import mean
+from numpy import std
 
-
+cust = pd.read_csv("C:\\Users\\SriramvelM\\Downloads\\train.csv")
+cust.head(2)
+cust.shape
 # cust['y'] = cust['y'].map({'yes':1,'no':0})
 
 ################# Data Cleaing ################################
