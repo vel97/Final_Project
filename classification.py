@@ -1,17 +1,4 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import plotnine
-from plotnine import ggplot, aes, geom_bar, geom_histogram, labs, geom_boxplot, geom_point
-from imblearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
-from sklearn.model_selection import RepeatedStratifiedKFold
-from numpy import mean
-from numpy import std
 
-cust = pd.read_csv("C:\\Users\\SriramvelM\\Downloads\\train.csv")
-cust.head(2)
-cust.shape
 
 # cust['y'] = cust['y'].map({'yes':1,'no':0})
 
@@ -88,6 +75,11 @@ for i in col1:
     plt.show()
 
 #kdeplot of histogram to check the distribution of customer reaction('y') with respect to age
+from sklearn import preprocessing
+label_encoder = preprocessing.LabelEncoder()
+
+cust['y'] = label_encoder.fit_transform(cust['y'])
+
 for i in col1:
     fig, ax = plt.subplots(1,1)
     sns.kdeplot(cust[cust["y"]==1][i], fill=True, color="blue", label="+ve", ax=ax)
@@ -169,7 +161,7 @@ fit = dt.fit(x_train, y_train)
 fit = dt.fit(x_sm, y_sm)
 
 #Evaluation of decision treee using AUROC
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
 
 #Predicting test data
 y_pred = dt.predict(x_test)
@@ -187,35 +179,46 @@ cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
 scores = cross_val_score(pipe, x_train, y_train, cv=cv)
 print('Mean ACCURACY: %.3f' % mean(scores))
 
-################## Reducing overfitting by n-fold cross validation ###########
-from sklearn.model_selection import cross_val_score
+##GridsearchCV
+from sklearn.model_selection import GridSearchCV
+param_grid = {
+    'criterion': ['gini', 'entropy'],
+    'max_depth': [None, 2 ,3 ,5 , 6 ,7],
+    'min_samples_split': [2, 3, 4, 5],
+    'min_samples_leaf': [1, 2, 4, 5],
+    'max_leaf_nodes': [None, 5, 10, 20],
+}
 
-def Decision_Tree(a):
-    for depth in a:
-        dt = DecisionTreeClassifier(max_depth=depth)
-        #Fitting dt to training data
-        dt.fit(x_train, y_train)
-        #Accuracy
-        Train_acc = accuracy_score(y_train, dt.predict(x_train))
-        dt = DecisionTreeClassifier(max_depth=depth)
-        Val_acc = cross_val_score(pipe, x_train, y_train, cv = cv)
-        print("Depth :", depth, "Training accuracy :", Train_acc, "Cross Val Score :", np.mean(Val_acc))
+dtree_cv = GridSearchCV(dt,  param_grid=param_grid, cv=5, verbose=2, n_jobs=4)
+dtree_cv.fit(x_train, y_train)
 
-Decision_Tree([1,2,3,4,5,6,7,8,9,10])
+#Best params
+dtree_cv.best_params_
 
-################# Feature Importances ########################
-steps = [('sampling', SMOTEENN(sampling_strategy='all')), ('model', DecisionTreeClassifier(max_depth = 6))]
+################# Best Model & Feature Importances ########################
+steps = [('sampling', SMOTEENN(sampling_strategy='all')), ('model', DecisionTreeClassifier(max_depth= 7, criterion='gini', min_samples_leaf=5, min_samples_split=5))]
 pipe = Pipeline(steps=steps)
 pipe.fit(x_train, y_train)
 y_pred = pipe.predict(x_test)
-# pipe.score(x_test, y_test)
-roc_auc_score(y_test, y_pred)
+y_predict_prob = pipe.predict_proba(x_test)
+Acc_dt = pipe.score(x_test, y_test)
+roc_dt = roc_auc_score(y_test, y_pred)
+f1_dt = f1_score(y_test, y_pred, average = 'macro')
 Feature_Imp = pipe['model'].feature_importances_ 
 plt.bar([i for i in range(len(Feature_Imp))],Feature_Imp)
 plt.show()
 FI = list(zip(Feature_Imp,x_test.columns))
 df = pd.DataFrame(FI)
 df
+
+################## tree ##########################################
+from sklearn import tree
+# dt = DecisionTreeClassifier(max_depth = 7)
+tree.plot_tree(pipe['model'])
+
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize = (4,4), dpi = 300)
+tree.plot_tree(pipe['model'], feature_names=x_test.columns, filled=True)
+fig.savefig('dtree.png')
 
 #Confusion matrix
 from sklearn.metrics import confusion_matrix
@@ -258,8 +261,8 @@ scores = cross_val_score(pipe, x_train, y_train, cv=cv)
 print('Mean ACCURACY: %.3f' % mean(scores))
 
 #Fitting random model
-from sklearn.ensemble import RandomForestClassifier
-rfc = RandomForestClassifier()
+# from sklearn.ensemble import RandomForestClassifier
+# rfc = RandomForestClassifier()
 pipe.fit(x_train, y_train)
 y_pred = pipe.predict(x_test)
 roc_auc_score(y_test, y_pred)
@@ -293,8 +296,15 @@ steps = [('sampling', SMOTEENN(sampling_strategy='all')), ('model', RandomForest
 pipe = Pipeline(steps=steps)
 pipe.fit(x_train, y_train)
 y_pred = pipe.predict(x_test)
-pipe.score(x_test, y_test)
-roc_auc_score(y_test, y_pred)
+acc_rf = pipe.score(x_test, y_test)
+roc_rf = roc_auc_score(y_test, y_pred)
+f1_rf = f1_score(y_test, y_pred, average='macro')
+Feature_Imp = pipe['model'].feature_importances_ 
+plt.bar([i for i in range(len(Feature_Imp))],Feature_Imp)
+plt.show()
+FI = list(zip(Feature_Imp,x_test.columns))
+df = pd.DataFrame(FI)
+df
 
 #Confusion matrix
 cm=confusion_matrix(y_test,y_pred)
@@ -320,3 +330,11 @@ print('The acuuracy of the model = TP+TN/(TP+TN+FP+FN) = ',(TP+TN)/float(TP+TN+F
 'Negative predictive Value = TN/(TN+FN) = ',TN/float(TN+FN),'\n',
 'Positive Likelihood Ratio = Sensitivity/(1-Specificity) = ',sensitivity/(1-specificity),'\n',
 'Negative likelihood Ratio = (1-Sensitivity)/Specificity = ',(1-sensitivity)/specificity)
+
+#summary of models
+df=pd.DataFrame()
+df['Model']=pd.Series(['Decision Tree','Random Forest'])
+df['Accuracy']=pd.Series([Acc_dt, acc_rf])
+df['ROC_AUC_Score']=pd.Series([roc_dt, roc_rf])
+df['F1-Score'] = pd.Series([f1_dt, f1_rf])
+df.set_index('Model')
