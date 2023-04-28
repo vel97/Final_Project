@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import plotnine
-# import scipy.stats as stats
 from plotnine import ggplot, aes,  geom_boxplot, geom_point
 from imblearn.pipeline import Pipeline
 
@@ -11,6 +9,7 @@ cust.head(2)
 cust.shape
 
 cust['y'] = cust['y'].map({'yes':1,'no':0})
+cust['y'] = cust['y'].astype(str)
 
 ############### Data Cleaning ############################
 #Datatypes of dataset
@@ -64,12 +63,6 @@ for i in col1:
 
 #Identifying and removing outliers
 #Checking for outliers
-# for i in col1:
-#     iqr = cust[i].quantile(0.75) - cust[i].quantile(0.25)
-#     Upper_T = cust[i].quantile(0.75) + (1.5 * iqr)
-#     Lower_T = cust[i].quantile(0.25) - (1.5 * iqr)
-#     Upper_T, Lower_T
-
 iqr1 = cust.dur.quantile(0.75) - cust.dur.quantile(0.25)
 Upper_T1 = cust.dur.quantile(0.75) + (1.5 * iqr1)
 Lower_T1= cust.dur.quantile(0.25) - (1.5 * iqr1)
@@ -173,6 +166,7 @@ cust['prev_outcome_unknown'] = cust['prev_outcome_unknown'].astype(str)
 x = cust.drop('y', axis='columns')
 y = cust['y']
 
+#Splitting the dataset
 from sklearn .model_selection import train_test_split
 x_train, x_test, y_train, y_test = train_test_split(x, y, train_size = 0.80, random_state=3)
 
@@ -227,11 +221,11 @@ grid_search.fit(x_train, y_train)
 #Best fit
 grid_search.best_params_
 
-# evaluate the model
+# evaluate the random model
 from sklearn.model_selection import cross_val_score
 m_scores = cross_val_score(pipeline, x_train, y_train, scoring='accuracy', cv=cv)
 
-# summarize the result
+# summarize the result for random model
 from numpy import mean
 from numpy import std
 print('Accuracy: %.3f (%.3f)' % (mean(m_scores), std(m_scores)))
@@ -242,13 +236,56 @@ pipeline = Pipeline([('s',selective),('sampling', SMOTEENN()),('m',model)])
 pipeline.fit(x_train, y_train)
 y_pred=pipeline.predict(x_test)
 
-from sklearn.metrics import roc_auc_score
-pipeline.score(x_test, y_test)
-roc_auc_score(y_test, y_pred)
+y_test = pd.DataFrame(y_test)
+y_test = y_test.astype('str')
+from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
+acc_lr = pipeline.score(x_test, y_test)
+roc_lr = roc_auc_score(y_test, y_pred)
+f1_lr = f1_score(y_test, y_pred, average='macro')
 
+#Predicted probability of the model
+yhat = pipeline.predict_proba(x_test)
+# Predicted probability of class 1
+yhat = yhat[:,1]
+
+# calculate roc curves
+from sklearn.metrics import roc_curve
+y_test = np.array(y_test)
+y_test = y_test.astype('float')
+fpr, tpr, thresholds = roc_curve(y_test, yhat)
+
+# calculate the g-mean for each threshold
+gmeans = np.sqrt(tpr * (1-fpr))
+
+# locate the index of the largest g-mean
+ix = np.argmax(gmeans)
+print('Best Threshold=%f, G-Mean=%.3f' % (thresholds[ix], gmeans[ix]))
+
+# plot the roc curve for the model
+plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
+plt.plot(fpr, tpr, marker='.', label='Logistic')
+plt.scatter(fpr[ix], tpr[ix], marker='o', color='black', label='Best')
+# axis labels
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend()
+# show the plot
+plt.show()
+
+# Classification based on obtained optimal threshold
+y_predict_class = [1 if prob > 0.362005 else 0 for prob in yhat]
+y_predict_class = pd.DataFrame(y_predict_class).astype('str')
+
+# Model evaluation on accuracy with respect to optimal threshold.
+print("ROC:", round(roc_auc_score(y_test, y_predict_class), 3))
+y_test = pd.DataFrame(y_test)
+y_test = y_test.astype('str')
+
+# Confusion matrix
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 cm=confusion_matrix(y_test,y_pred)
+# cm=confusion_matrix(y_test,y_predict_class)
 conf_matrix=pd.DataFrame(data=cm,columns=['Predicted:0','Predicted:1'],index=['Actual:0','Actual:1'])
 plt.figure(figsize = (8,5))
 sns.heatmap(conf_matrix, annot=True,fmt='d',cmap="YlGnBu")
@@ -271,8 +308,6 @@ print('The acuuracy of the model = TP+TN/(TP+TN+FP+FN) = ',(TP+TN)/float(TP+TN+F
 'Negative predictive Value = TN/(TN+FN) = ',TN/float(TN+FN),'\n',
 'Positive Likelihood Ratio = Sensitivity/(1-Specificity) = ',sensitivity/(1-specificity),'\n',
 'Negative likelihood Ratio = (1-Sensitivity)/Specificity = ',(1-sensitivity)/specificity)
-
-########### this data performs poorly on logistic regression model.###########
 
 ############# KNN algorithm ###################################
 from sklearn.neighbors import KNeighborsClassifier
@@ -305,9 +340,10 @@ pipeline = Pipeline([('s',selective),('sampling', SMOTEENN()),('m',model)])
 pipeline.fit(x_train, y_train)
 y_pred=pipeline.predict(x_test)
 
-from sklearn.metrics import roc_auc_score
-pipeline.score(x_test, y_test)
-roc_auc_score(y_test, y_pred)
+from sklearn.metrics import roc_auc_score, f1_score
+acc_knn = pipeline.score(x_test, y_test)
+roc_knn = roc_auc_score(y_test, y_pred)
+f1_knn = f1_score(y_test, y_pred, average='macro')
 
 #Confusion matrix
 from sklearn.metrics import confusion_matrix
@@ -368,9 +404,10 @@ pipeline = pipeline = Pipeline([('s',selective),('sampling', SMOTEENN()),('m',mo
 pipeline.fit(x_train, y_train)
 y_pred=pipeline.predict(x_test)
 
-from sklearn.metrics import roc_auc_score
-pipeline.score(x_test, y_test)
-roc_auc_score(y_test, y_pred)
+from sklearn.metrics import roc_auc_score, f1_score
+acc_svm = pipeline.score(x_test, y_test)
+roc_svm = roc_auc_score(y_test, y_pred)
+f1_svm = f1_score(y_test, y_pred, average='macro')
 
 #Confusion matrix
 from sklearn.metrics import confusion_matrix
@@ -398,3 +435,11 @@ print('The acuuracy of the model = TP+TN/(TP+TN+FP+FN) = ',(TP+TN)/float(TP+TN+F
 'Negative predictive Value = TN/(TN+FN) = ',TN/float(TN+FN),'\n',
 'Positive Likelihood Ratio = Sensitivity/(1-Specificity) = ',sensitivity/(1-specificity),'\n',
 'Negative likelihood Ratio = (1-Sensitivity)/Specificity = ',(1-sensitivity)/specificity)
+
+#summary of models
+df=pd.DataFrame()
+df['Model']=pd.Series(['Logistic regression','KNN','SVM'])
+df['Accuracy']=pd.Series([acc_lr, acc_knn, acc_svm])
+df['ROC_AUC_Score']=pd.Series([roc_lr, roc_knn, roc_svm])
+df['F1-Score'] = pd.Series([f1_lr, f1_knn, f1_svm])
+df.set_index('Model')
